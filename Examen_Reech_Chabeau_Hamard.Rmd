@@ -1,0 +1,51 @@
+---
+title: "Examen réechantillonage"
+author: "Lucas Chabeau, Etienne Hamard"
+date: "19/11/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+#Option pour que le code ne soit pas affiché lors du knit
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Exercice 1 - Simulation par inversion
+
+On considère la fonction densité suivante, définie pour $a > 0, b > 0$ :
+
+$$
+f(x) = \left\{
+    \begin{array}{ll}
+        \frac{ab^a}{x^{a+1}} & \mbox{si } x \geqslant b,\\
+        0 & \mbox{sinon.}
+    \end{array}
+\right.
+$$
+
+1. Représenter cette densité pour $b = 2$ et $a \in \{1, 2, 3\}$
+
+```{r}
+### Fonction de densité de l'énoncé
+F_x <- function(x, a, b){
+  return(ifelse(x >= b,(a*b^a)/(x^(a+1)),0))
+}
+```
+
+```{r}
+F_x(x=1,a=2,b=2)
+```
+
+
+```{r}
+#Plage x sur laquelle on va représenter nos fonctions
+x <- seq(0,20,0.01)
+
+#Représentation graphique de nos 3 fonction
+plot(x, F_x(x=x,a=3,b=2), type='l', xlab='x', ylab='Densité')
+lines(x, F_x(x=x,a=2,b=2), type='l', col='red')
+lines(x, F_x(x=x,a=1,b=2), type = 'l', col='blue')
+legend(15, 1.2, legend=c('a = 3', 'a = 2', 'a = 1'), col=c('black', 'red', 'blue'), lty=rep(1,3), cex=1)
+```
+
+
