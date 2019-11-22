@@ -2,7 +2,9 @@
 title: "Examen réechantillonage"
 author: "Lucas Chabeau, Etienne Hamard"
 date: "19/11/2019"
-output: pdf_document
+output:
+  pdf_document:
+    latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
@@ -46,6 +48,32 @@ plot(x, F_x(x=x,a=3,b=2), type='l', xlab='x', ylab='Densité')
 lines(x, F_x(x=x,a=2,b=2), type='l', col='red')
 lines(x, F_x(x=x,a=1,b=2), type = 'l', col='blue')
 legend(15, 1.2, legend=c('a = 3', 'a = 2', 'a = 1'), col=c('black', 'red', 'blue'), lty=rep(1,3), cex=1)
+```
+
+## 2.Implémenterune procédure d'inversion pour simuler une variableléatoire selon cette densité.
+
+
+ On calcul la fonction de répartition de notre densité $f$:
+ 
+\begin{align*}
+ F(x)=  \int_{b}^{t}\frac{ab^a}{t^{a+1}} \, \mathrm{d}t  \\
+ = ab^{a} \int_{b}^{t} t^{-a-1} \, \mathrm{d}t \\
+ = ab^{a} \left [ \frac{t^{-a}}{-a} \right ]_{b}^{t} \\
+ =1 - (\frac{b}{x})^{a}
+\end{align*}
+ 
+Ensuite il nous faut calculer l'inverse de cette fonction:
+\begin{align*}
+u=1 - (\frac{b}{x})^{a}\\
+-u+1=(\frac{b}{x})^{a}\\
+(-u+1)^{\frac{1}{a}}=\frac{b}{x}\\
+\frac{b}{(-u+1)^{\frac{1}{a}}}=x\\
+\end{align*}
+
+Une fois que nous avons notre fonction inverse 
+```{r}
+
+
 ```
 
 
