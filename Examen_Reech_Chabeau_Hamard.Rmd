@@ -25,7 +25,7 @@ f(x) = \left\{
 \right.
 $$
 
-1. Représenter cette densité pour $b = 2$ et $a \in \{1, 2, 3\}$
+## 1. Représenter cette densité pour $b = 2$ et $a \in \{1, 2, 3\}$
 
 ```{r}
 ### Fonction de densité de l'énoncé
@@ -34,46 +34,473 @@ F_x <- function(x, a, b){
 }
 ```
 
-```{r}
-F_x(x=1,a=2,b=2)
-```
-
 
 ```{r}
 #Plage x sur laquelle on va représenter nos fonctions
 x <- seq(0,20,0.01)
 
 #Représentation graphique de nos 3 fonction
-plot(x, F_x(x=x,a=3,b=2), type='l', xlab='x', ylab='Densité')
+plot(x, F_x(x=x,a=3,b=2), type='l', xlab='x', ylab='Densité', col='green')
 lines(x, F_x(x=x,a=2,b=2), type='l', col='red')
 lines(x, F_x(x=x,a=1,b=2), type = 'l', col='blue')
-legend(15, 1.2, legend=c('a = 3', 'a = 2', 'a = 1'), col=c('black', 'red', 'blue'), lty=rep(1,3), cex=1)
+legend(15, 1.2, legend=c('a = 3', 'a = 2', 'a = 1'), col=c('green', 'red', 'blue'), lty=rep(1,3), cex=1)
 ```
 
-## 2.Implémenterune procédure d'inversion pour simuler une variableléatoire selon cette densité.
+## 2.Implémenterune procédure d'inversion pour simuler une variable aléatoire selon cette densité.
+
+La première étape consiste à donner l'expression de la fonction de répartition $F(x)$ de notre densité $f(x)$ :
 
 
- On calcul la fonction de répartition de notre densité $f$:
- 
 \begin{align*}
  F(x)=  \int_{b}^{t}\frac{ab^a}{t^{a+1}} \, \mathrm{d}t  \\
  = ab^{a} \int_{b}^{t} t^{-a-1} \, \mathrm{d}t \\
  = ab^{a} \left [ \frac{t^{-a}}{-a} \right ]_{b}^{t} \\
  =1 - (\frac{b}{x})^{a}
 \end{align*}
- 
-Ensuite il nous faut calculer l'inverse de cette fonction:
+
+
+Ensuite il faut inverser la fonction $F$:
+
+
 \begin{align*}
-u=1 - (\frac{b}{x})^{a}\\
--u+1=(\frac{b}{x})^{a}\\
-(-u+1)^{\frac{1}{a}}=\frac{b}{x}\\
-\frac{b}{(-u+1)^{\frac{1}{a}}}=x\\
+  u=1 - (\frac{b}{x})^{a}\\
+  -u+1=(\frac{b}{x})^{a}\\
+  (-u+1)^{\frac{1}{a}}=\frac{b}{x}\\
+  \frac{b}{(-u+1)^{\frac{1}{a}}}=x\\
 \end{align*}
 
-Une fois que nous avons notre fonction inverse 
+
+Maintenant que c'est fait nous créons une fonction sur R qui tire un échantillon alétaoire $U_n$ de taille $n$ en suivant une loi uniforme $\mathcal{U}(0,1)$, puis calcule pour chaque tirage $i$ de $U$ $F^{-1}(U_i)$. Ce qui nous donnera un tirage suivant notre densité car $F^{-1}(U) = f(x)$.
+
 ```{r}
+#Fonction de simulation :
+Simul_inv <- function(n, a, b){
+  
+  #Vecteur des u suivant une loi uniforme [0;1]
+  u <- runif(n=n, min=0, max=1)
+  
+  #Fonction inverse de la fonction de répartition
+  return((b/(-u+1)^(1/a)))
+}
+```
+
+
+## 3.Simuler un échantillon et comparer graphiquement la densité obtenue empiriquement à la densité théorique
+
+On a simulé un échantillon pour $a = 1$, $a = 2$ et $a = 3$. Nous avons tracé leur histogramme et y avons supperposé la courbe de la fonction de densité correspondante. On voit ça se suit bien. Cette méthode est donc satisfaisante pour simuler un échantillon suivant cette loi.
+
+```{r}
+#Simulation d'un échantillon suivant notre densité
+hist(Simul_inv(n=2000, a=1, b=2), xlim=c(0,20), breaks=5000, freq=FALSE)
+lines(x, F_x(x=x,a=1,b=2), type = 'l', col='blue')
+
+hist(Simul_inv(n=2000, a=2, b=2), xlim=c(0,20), breaks=500, freq=FALSE)
+lines(x, F_x(x=x,a=2,b=2), type = 'l', col='red')
+
+hist(Simul_inv(n=2000, a=3, b=2), xlim=c(0,20), breaks=200, freq=FALSE)
+lines(x, F_x(x=x,a=3,b=2), type = 'l', col='green')
+```
+
+
+# Exercice 2 : Approximation de la fonction de répartition de la loi normale centrée réduite par approche MC
+
+On cherche à approximer par une approche Monte-Carlo la fonction de répartition de la loi normale centrée réduite :
+
+$$\phi(x) = \int_{-\infty}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt$$
+
+pour des valeurs $x > 0$.
+
+## 1. Proposer une méthode basée sur la loi uniforme, et de préférence la loi $\mathcal{U}(0,1)$.
+
+Nous voulons utiliser une loi $\mathcal{U}(0,1)$ pour résoudre notre problème. Le problème est que notre intégrale est entre $-\infty$ et $x$. Nous devons faire un changement de variable pour ramener les limites de l'intégrale à $[0, 1]$. Nous faisons donc le calcul suivant.
+
+\begin{align*}
+  I = \int_{-\infty}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt \\
+  I = \int_{-\infty}^{-x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt + \int_{-x}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt \\
+  I = \int_{-\infty}^{-x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt + 2 * \int_{0}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt \\
+  I = \int_{0}^{1} \frac{1}{\sqrt{2\pi}} exp(-(-\frac{x}{u})^2/2) \frac{x}{u^2}du + 2 * \int_{0}^{1} \frac{1}{\sqrt{2\pi}} exp(-(ux)^2/2) xdu
+\end{align*}
+
+Une fois cette intégrale posée, nous n'avons plus qu'à tirer m valeurs suivants une loi uniforme $\mathcal{U}(0,1)$ et faire la moyenne des valeurs pour chaque $u_i$ et le quantile $x$ choisi. 
+
+
+```{r}
+#Fonction pour calculer notre Intégrale
+Iunif <- function(x, m){
+  
+  #Tirage m valeurs suivants une loi uniforme (0;1)
+  u = runif(m)  
+  
+  #Calcul de l'intégrale
+  ihat = mean(1/sqrt(2*pi)*exp(-(-x/u)^2/2)*x/u^2) + 2*mean(1/sqrt(2*pi)*exp(-(u*x)^2/2)*x)
+  return(ihat)
+}
+```
+
+## 2. Proposer une méthode basée sur la loi normale.
+
+Cette fois-ci nous n'avons pas à modifier la formule de notre intégrale. Il faut juste prendre en compte le fait que la loi normale $\mathcal{N}(0,1)$ donne des valeurs dans $\mathbb{R}$. Or nous voulons une intégrale entre $]-\infty;x]$. Nous ajoutons donc une fonction indicatrice qui fera que seules les valeurs tirées inférieures à $x$ sont prises en compte. Nous n'avons ensuite qu'à calculer la moyenne des valeurs aléatoires tirées inférieures à $x$.
+
+```{r}
+#Fonction pour calculer notre Intégrale
+Inorm <- function(x, m){
+  
+  #Tirage m valeurs suivants une loi normal (0;1)
+  g = rnorm(m)
+  
+  #Calcul de l'intégrale
+  ihat = mean(g<=x)
+  return(ihat)
+}
+```
+
+## 3. Comparer les valeurs obtenues par les deux procédures à la valeur réelle donnée par R via la fonction pnorm pour des valeurs croissantes de $x \in [0.1, 3]$. On considérera un nombre de tirages $n = 1000$.
+
+```{r}
+#Paramètres de notre approximation
+m <- 1000
+x <- seq(0.1,3,0.1)
+plot(x, pnorm(x), type='b', ylim=c(0,1))
+lines(x, sapply(x,Iunif,m=1000), type='b', col='red')
+lines(x, sapply(x,Inorm,m=1000), type='b', col='green')
+```
+
+
+## 4. Comparer la variance et les intervalles de confiance des deux estimateur pour les valeurs croissantes de $x \in [0.1, 3]$ et interpréter les résultats obtenus.
+
+## 5. Comment modifier la procédure si $x < 0$ ?
+
+
+# Exercice 3 - bootstrap & ACP
+
+```{r}
+load("examen-dataset/spectra.Rdata")
+library("FactoMineR")
+library("factoextra")
+
+```
+
+## 1. Représenter (sur une même figure) un échantillon aléatoire de 50 spectres pour en apprécier leur variabilité, et commenter le résultat obtenu.
+
+```{r}
+set.seed(1)
+
+## Vecteur de de longueur ncol(X) 
+i <-  c(1:ncol(X))
+## Sample aléatoire parmi les 546 spectres
+j <- sample(nrow(X), 50, replace = FALSE)
+
+
+## plot des spectres
+plot(i,X[j[1],] , type="l", ylim = c(0.03, 0.09), xlab = "spectral channel",ylab="intensity", main = "Représentation de 50 spectres aléatoirements choisis")
+for (k in j[2:50]) {
+lines(i,X[k,])
+}
+```
+
+On peut voir la variance des spectres augmente entre les indices 100 et 150.
+
+
+## 2. Effectuer une ACP et représenter les proportions de variance expliquées par les 10 premières composantes principales : quelle proportion de la variance totale est expliquée par les deux premières composantes principales ? Représenter sous la forme de spectres les deux axes principaux (i.e., les opérateurs linéaires permettant de passer de l’espace des canaux aux deux premières composantes principales) : sont-ils cohérents avec vos observations de la question 1 ?
+
+```{r}
+
+##ACP sur la matrice X 
+res.pca <- PCA(X, graph = FALSE, scale.unit = TRUE)
+
+##Extraction des valeurs propres
+eig.val <- get_eigenvalue(res.pca)
+var_exp <- eig.val[1:10,2]
+var_cumul <- eig.val[2,3]
+
+
+### Affichage des variances expliquées des 10 premiers axes
+plot(var_exp, type = "b",xlab= "n-iéme composante",ylab="% de variance expliquée", main = "Proportion de variance expliquée par les 10 premières composantes")
+
+
+### Plot des deux premiers axes sous formes de spectres (a finir)
+plot(i,res.pca$var$coord[,1], type = "l",xlab = "spectral channel",ylab="intensity", main=" Spectres des deux premières composantes" );
+lines(i,res.pca$var$coord[,2])
 
 
 ```
 
 
+Les deux premières composantes expliquent `r round(var_cumul,3)`% de la variance.
+La représentation des spectres des deux premières dimensions parait cohérent avec les autres spectres, l'allure est similaire mais les valeurs sont beaucoup plus faibles
+
+##  3. Implémenter une procédure bootstrap pour calculer les intervalles de confiance associés aux proportions de variance expliquées par les 10 premières composantes principales, par la méthode de votre choix (e.g., quantile, basique, ...). Proposer une représentation graphique de vos résultats.
+
+```{r}
+
+
+set.seed(13)
+require(bootstrap)
+
+n <- length(X[,1])
+set.seed(1)
+B <- 20
+cor_boots_dim1 <- NULL
+cor_boots_dim2 <- NULL
+### ACP avec Bootstrap
+var_exp_boots <- NULL
+for(b in 1:B){
+  ind = sample(c(1:n), n, replace = TRUE)
+  acp_boots <- PCA(X[ind,], graph = FALSE, scale.unit = TRUE)
+  eig.val_boots <- get_eigenvalue(acp_boots)
+  var_exp_boots <- rbind(var_exp_boots,eig.val_boots[1:10,2])
+  cor_boots_dim1 <- cbind(cor_boots_dim1,acp_boots$var$cor[,"Dim.1"])
+  cor_boots_dim2 <- cbind(cor_boots_dim2,acp_boots$var$cor[,"Dim.2"])
+}
+
+
+# Calcul des intervalles de confiance
+alpha = 0.05
+Iperc <-NULL
+b1 <- NULL; b2 <- NULL
+
+
+# percentile method
+for (j in 1:length(var_exp_boots[1,])) {
+  q1 = quantile(var_exp_boots[,j], alpha/2)
+  q2 = quantile(var_exp_boots[,j], 1-alpha/2)
+  b2 <- rbind(b2,q2 )
+  b1 <- rbind(b1, q1)
+}
+inter_conf <- cbind(b1, b2)
+
+
+## Plot des la variance expliquée et de son intervalles de confiance
+plot(inter_conf[,1], type = "l", col="red", main="Variance expliquée par composante", xlab="n-ième composante", ylab="% de variance expliquée", lty=2);lines(inter_conf[,2], col="red", type = "l", lty=2); lines(var_exp, type = "l")
+```
+
+L'écart de l'interval de confiance réduit fortement pour les composantes expliquant le moins de variance. 
+
+
+
+```{r}
+hist(var_exp_boots[,"Dim.1"], col = "lightblue", border = "white",xlab="% de variance expliquée", main = "Histogramme de la variance expliquée \n par la 1ère composante estimée", ylab = "Fréquence")
+
+abline(v = inter_conf[1,],lty = 2, lwd = 2, col = "red")
+
+legend("topleft", c("red"), c("IC-perc"), col = c("red"),lty =2, lwd = 2, bg = "white")
+
+abline(v = var_exp["Dim.1"], lwd = 2)
+
+mtext("Valeur réelle", side = 1, at = var_exp["Dim.1"])
+
+box()
+```
+
+
+```{r}
+hist(var_exp_boots[,"Dim.2"], col = "lightblue", border = "white",xlab="% de variance expliquée", main = "Histogramme de la variance expliquée \n par la 2ème composante estimée", ylab = "Fréquence")
+
+abline(v = inter_conf[2,],lty = 2, lwd = 2, col = "red")
+
+legend("topleft", c("red"), c("IC-perc"), col = c("red"),lty =2, lwd = 2, bg = "white")
+
+abline(v = var_exp["Dim.2"], lwd = 2)
+
+mtext("Valeur réelle", side = 1, at = var_exp["Dim.2"])
+
+box()
+```
+
+
+La distribution de l'estimation de la variance expliquée et la valeur réelle sont comprises entre les borne de l'interval de confiance.
+
+
+## 4. Enfin, modifier votre procédure pour pouvoir représenter la variabilité induite par le bootstrap sur les axes principaux de la question 2 et commenter les résultats obtenus.
+
+
+```{r}
+
+##### Calcul des intervalles de confiance pour les cor des 2 premiers axes
+alpha <- 0.05
+Iperc <-NULL
+b1 <- NULL; b2 <- NULL; b3 <- NULL; b4 <- NULL
+inter_conf_cor <- NULL
+
+##### percentile method
+for (j in 1:length(cor_boots_dim2[,1])) {
+  q1 <- quantile(cor_boots_dim1[j,], alpha/2)
+  q2 <- quantile(cor_boots_dim1[j,], 1-alpha/2)
+  q3 <- quantile(cor_boots_dim2[j,], alpha/2)
+  q4 <- quantile(cor_boots_dim2[j,], 1-alpha/2)
+  b1 <- rbind(b1,q1)
+  b2 <- rbind(b2,q2 )
+  b3 <- rbind(b3,q3 )
+  b4 <- rbind(b4,q4 )
+
+}
+inter_conf_cor1 <- cbind(b1, b2)
+inter_conf_cor2 <- cbind(b3, b4)
+
+
+plot(i,res.pca$var$cor[,1], type = "l",xlab = "spectral channel",ylab="intensity", main=" Spectres des deux premières composantes avec interval de confiance" );
+lines(i,res.pca$var$cor[,2])
+lines(inter_conf_cor1[,1], col="red",lty =2)
+lines(inter_conf_cor1[,2], col="red",lty =2)
+lines(inter_conf_cor2[,1], col="blue",lty =2)
+lines(inter_conf_cor2[,2], col="blue",lty =2)
+
+```
+
+L'intervalle de confiance encadre bien les spectres originaux.
+
+
+# Exercice 4 : tests par permutation
+
+Charger le jeu de données permutation.Rdata. Il contient une matrice X de taille 200 × 2 représentée ci-dessous, les 100 premières lignes de la matrice correspondant aux points noirs, et les 100 dernières aux points rouges.
+
+```{r}
+#Chargement des données
+load("examen-dataset/permutation-dataset.Rdata")
+```
+
+```{r}
+#Affichage du graphique
+plot(X, col = c(rep('black',100),rep('red', 100)),pch=16, xlab='x1', ylab='x2')
+```
+
+
+On souhaite tester si on est capable de détecter une différence entre ces deux populations, i.e., si on est capable de détecter une différence significative entre les deux nuages de points, stockés dans les 100 premières et les 100 dernières lignes de la matrice. On considère pour cela une statistique basée sur une information de voisinage :
+
+$$T = \frac{1}{n}\sum_{i=1}^n \mathbf{1}(y_{n(x_i)}=y_i)$$
+
+où $n(x_i) \in \{1, ..., i − 1, i + 1, .., n\}$ est l’indice du plus proche voisin du point $x_i$, $y_i = 1$ si $x_i$ appartient aux premier ensemble de points (les points noirs) et $y_i = 0$ sinon, et la fonction $\mathbf{1}$(.) vaut 1 si son argument est vérifié et 0 sinon.
+
+## 1. Que mesure cette statistique ?
+
+Cette statistique donne un indicatuer de l'hétérogénité des deux groupes. D'un point de vur plus mathématique, elle mesure la proportion de points qui ont leur plus proche vois du même groupe qu'eux. Ainsi, si les deux groupes sont bien hétérogènes, cette statistique sera proche de 1 et si au contraire, les deux groupes sont mélangés, cette statistique se rapprochera de 0.5. Et dans le cas extrême où les groupes sont indisociables (mais cas bizarre pour de l'aléatoire) car chaque voisin le plus proche appartient à l'autre groupe, cette statistique prendrait la valeur 0.
+
+Posons tout de suite les hypothèses de notre problème :
+- H0 : Les groupes sont indisociables
+- H1 : Les groupes sont disociables
+
+Nous sommes ici dans un cas unilatéral car même si T = 0 serait un cas très étrange pour de l'aléatoire et à creuser, ça ne permet pas en l'état de discriminer les groupes. Nous rejetterons donc l'hypothèse nulle si T est suffisament supérieur à 0.5
+
+```{r}
+#Ajout d'une colonne groupe à notre jeu de données
+#X_grp <- cbind(c(rep(0, 100), rep(1, 100)), X)
+#colnames(X_grp) <- c('grp', 'x1', 'x2')
+
+###Calcul de notre stat de Test
+
+#Fonction qui trouve le voisin le plus proche
+FindPpv <- function(ind){
+  return(names(ind)[which(ind == min(ind, na.rm = TRUE))])
+}
+
+#Matrice des distances
+distances <- as.matrix(dist(X))
+diag(distances) <- NA
+
+#Vecteur des voisins
+ppv <- apply(distances,1,FindPpv)
+
+#Calcul de la stat T
+statT0 <- mean(c(as.numeric(ppv[1:100])<=100, as.numeric(ppv[101:200])>100))
+```
+
+Ici, nous avons $T$ = `r round(statT0, 2)`
+
+## 2. Apppliquer une procédure par permutation pour B = 1000 tirages et évaluer la p-valeur obtenue. La différence entre les deux nuages de points est-elle significative ?
+
+Nous allons maintenant permuter aléatoirement les positions de nos points (leur position dans le jeu de données, pas leurs coordonnées. C'est à dire que la ligne du 4ème point pourra passer à la 142ème ligne par exemple.). En rappelant que les 100 premiers points correspondent à un groupe et les 100 derniers à l'autre groupe. Cette permutation aura pour effet de changer les groupes de certains points. L'opération étant totalement aléatoire et répété un grand nombre (1000) de fois, nous aurons des valeurs de T qui (sauf si on a vraiment pas de chance mais c'est très improbable) seront distribuées sous la loi de l'hypothèse nulle (Il n'y a pas de différence entre les deux groupes.).
+
+```{r}
+#Paramètres b du nombre de répétition
+b <- 1000
+statT <- numeric(b)
+
+#Boucle allant de 1 à b
+for (i in 1:b){
+  #Changement des positions des points au sein de X
+  X_h0 <- X[sample(1:dim(X)[1], replace=F),]
+  
+  #Calcul de T
+  distances <- as.matrix(dist(X_h0))
+  diag(distances) <- NA
+  ppv <- apply(distances,1,FindPpv)
+  statT[i] <- mean(c(as.numeric(ppv[1:100])<=100, as.numeric(ppv[101:200])>100))
+}
+
+#Ajout de notre vrai T (observé sur les données) à la simulation
+statT <- c(statT0,statT)
+```
+
+```{r}
+#Calcul de notre p-valeur
+pval = mean(statT[-1] >= statT0)
+
+#Affichage de l'histogramme de la distribution de nos T
+hist(statT, xlab='T', main='Distribution de notre statistique T')
+abline(v=statT0, col='red')
+```
+
+L'histogramme ci-dessus représente la distribution de nos statistiques T obtenues lors de nos `r b` tirages aléatoires. La ligne rouge représente notre statistique T observée sur le vrai jeu de données. Nous voyons que nos T sont centrées autour de 0.5, ce qui est logique puisque dans le cas aléatoire, nous devrions avoir T = 0.5 (Autant de chance que le plus proche voisin soit de la classe 1 que de la classe 2, donc de la même classe que soi.). Rien qu'en regardant l'histogramme, nous voyons que notre T observée est bien supérieure que dans le cas aléatoire. Et que donc, les groupes sont identifiables. La p-valeur de `r round(pval,2)` vient confirmer cette impression car inférieure à 0.05. La différence entre les deux nuages est donc bien significative.
+
+
+## 3. Reproduire cette analyse en tirant aléatoirement un ensemble de n = 10, 20, ..., 90 points parmi chaque population. Comment la p-valeur évolue t’elle ? Représenter les résultats sous la forme d’un graphique.
+
+```{r}
+#Initialisation des paramètres
+n <- seq(10,90,10)
+
+#Fonction qui calcule fait tous les traitements de tirage etc et calcule la p-valeur directement
+Pval_n <- function(n, t0, b){
+  
+  #Initialisation de statT
+  statT <- numeric(b)
+  
+  #Boucle allant de 1 à b
+  for (i in 1:b){
+    
+    #Tirage aléatoire de n valeurs de x dans chaque population
+    subX <- rbind(X[sample(1:as.integer(dim(X)[1]/2), size=n, replace=F),], X[sample(as.integer(dim(X)[1]/2+1):dim(X)[1], size=n, replace=F),])
+    
+    #Changement des positions des points au sein de subX
+    subX_h0 <- subX[sample(1:dim(subX)[1], replace=F),]
+    
+    #Calcul de T
+    distances <- as.matrix(dist(subX_h0))
+    diag(distances) <- NA
+    ppv <- apply(distances,1,FindPpv)
+    statT[i]<-mean(c(as.numeric(ppv[1:n])<=n, as.numeric(ppv[(n+1):(2*n)])>n))
+  }
+  statT <- c(t0,statT)
+  return(mean(statT[-1] >= t0))
+}
+```
+
+```{r}
+#Calcul de la p-valeur pour chaque n
+pval_n <- sapply(n, Pval_n, t0=statT0, b=1000)
+```
+
+```{r}
+plot(x=n, y=pval_n, xlab='n', ylab='p-valeur', main='Evolution de la p-valeur en fonction de la taille de chaque groupe', type='b')
+```
+
+On observe que que la p-valeur diminue dans un premier temps lorsque la taille de chaque échantllon augmente. Puis se stabiise lorsque $n$ est assez grand. Dans notre cas, la p-valeur semble se stabiliser à partir de $n = 50$.
+
+## 4. Enfin, reproduire cette seconde analyse 10 fois et représenter la variabilité dans les p-valeurs obtenues en fonction du nombre de points considérés. A partir de quelle taille d’échantillon est-on capable de détecter une différence significative en considérant que la médiane des p-valeurs obtenues sur les 10 répétitions doit être (et rester) inférieure à 0.05 ?
+
+```{r}
+pval_n_10 <- sapply(n, Pval_n, t0=statT0, b=1000)
+for(i in 1:9){
+  pval_n_10 <- rbind(pval_n_10, sapply(n, Pval_n, t0=statT0, b=1000))
+}
+```
+
+```{r}
+plot(x=n, y=pval_n_10[1,], xlab='n', ylab='p-valeur', main='Evolution de la p-valeur en fonction de la taille de chaque groupe', type='b', ylim=c(0,0.1))
+for(i in 2:dim(pval_n_10)[1]){
+ lines(x=n, y=pval_n_10[i,], xlab='n', ylab='p-valeur', main='Evolution de la p-valeur en fonction de la taille de chaque groupe', type='b', col=i) 
+}
+abline(h=0.05, col='red', lty=2)
+```
+
+Plus $n$ est grand, plus la variabilité des p-valeurs pour un $n$ fixé diminue. On constate qu'à partir de $n$ = 20 (dans chaque groupe), nous pouvons détécter une différence significative entre les deux groupes. Si on ne se base que sur la médiane des p-valeurs, on peut réduire encore un peu l'échantillon (de peu), mais vu la longueur des calculs, nous n'avons testé les n qu'avec un pas de 10.

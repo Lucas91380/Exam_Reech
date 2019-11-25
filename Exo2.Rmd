@@ -1,0 +1,81 @@
+---
+title: "Examen réechantillonage"
+author: "Lucas Chabeau, Etienne Hamard"
+date: "19/11/2019"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+#Option pour que le code ne soit pas affiché lors du knit
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Exercice 2 : Approximation de la fonction de répartition de la loi normale centrée réduite par approche MC
+
+On cherche à approximer par une approche Monte-Carlo la fonction de répartition de la loi normale centrée réduite :
+
+$$\phi(x) = \int_{-\infty}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt$$
+
+pour des valeurs $x > 0$.
+
+## 1. Proposer une méthode basée sur la loi uniforme, et de préférence la loi $\mathcal{U}(0,1)$.
+
+Nous voulons utiliser une loi $\mathcal{U}(0,1)$ pour résoudre notre problème. Le problème est que notre intégrale est entre $-\infty$ et $x$. Nous devons faire un changement de variable pour ramener les limites de l'intégrale à $[0, 1]$. Nous faisons donc le calcul suivant.
+
+\begin{align*}
+  I = \int_{-\infty}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt \\
+  I = \int_{-\infty}^{-x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt + \int_{-x}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt \\
+  I = \int_{-\infty}^{-x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt + 2 * \int_{0}^{x} \frac{1}{\sqrt{2\pi}} exp(-t^2/2)dt \\
+  I = \int_{0}^{1} \frac{1}{\sqrt{2\pi}} exp(-(-\frac{x}{u})^2/2) \frac{x}{u^2}du + 2 * \int_{0}^{1} \frac{1}{\sqrt{2\pi}} exp(-(ux)^2/2) xdu
+\end{align*}
+
+Une fois cette intégrale posée, nous n'avons plus qu'à tirer m valeurs suivants une loi uniforme $\mathcal{U}(0,1)$ et faire la moyenne des valeurs pour chaque $u_i$ et le quantile $x$ choisi. 
+
+
+```{r}
+#Fonction pour calculer notre Intégrale
+Iunif <- function(x, m){
+  
+  #Tirage m valeurs suivants une loi uniforme (0;1)
+  u = runif(m)  
+  
+  #Calcul de l'intégrale
+  ihat = mean(1/sqrt(2*pi)*exp(-(-x/u)^2/2)*x/u^2) + 2*mean(1/sqrt(2*pi)*exp(-(u*x)^2/2)*x)
+  return(ihat)
+}
+```
+
+## 2. Proposer une méthode basée sur la loi normale.
+
+Cette fois-ci nous n'avons pas à modifier la formule de notre intégrale. Il faut juste prendre en compte le fait que la loi normale $\mathcal{N}(0,1)$ donne des valeurs dans $\mathbb{R}$. Or nous voulons une intégrale entre $]-\infty;x]$. Nous ajoutons donc une fonction indicatrice qui fera que seules les valeurs tirées inférieures à $x$ sont prises en compte. Nous n'avons ensuite qu'à calculer la moyenne des valeurs aléatoires tirées inférieures à $x$.
+
+```{r}
+#Fonction pour calculer notre Intégrale
+Inorm <- function(x, m){
+  
+  #Tirage m valeurs suivants une loi normal (0;1)
+  g = rnorm(m)
+  
+  #Calcul de l'intégrale
+  ihat = mean(g<=x)
+  return(ihat)
+}
+```
+
+## 3. Comparer les valeurs obtenues par les deux procédures à la valeur réelle donnée par R via la fonction pnorm pour des valeurs croissantes de $x \in [0.1, 3]$. On considérera un nombre de tirages $n = 1000$.
+
+```{r}
+#Paramètres de notre approximation
+m <- 1000
+x <- seq(0.1,3,0.1)
+plot(x, pnorm(x), type='b', ylim=c(0,1))
+lines(x, sapply(x,Iunif,m=1000), type='b', col='red')
+lines(x, sapply(x,Inorm,m=1000), type='b', col='green')
+```
+
+
+## 4. Comparer la variance et les intervalles de confiance des deux estimateur pour les valeurs croissantes de $x \in [0.1, 3]$ et interpréter les résultats obtenus.
+
+## 5. Comment modifier la procédure si $x < 0$ ?

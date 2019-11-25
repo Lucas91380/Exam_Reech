@@ -1,0 +1,168 @@
+---
+title: "Examen réechantillonage"
+author: "Lucas Chabeau, Etienne Hamard"
+date: "19/11/2019"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+#Option pour que le code ne soit pas affiché lors du knit
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Exercice 4 : tests par permutation
+
+Charger le jeu de données permutation.Rdata. Il contient une matrice X de taille 200 × 2 représentée ci-dessous, les 100 premières lignes de la matrice correspondant aux points noirs, et les 100 dernières aux points rouges.
+
+```{r}
+#Chargement des données
+load("examen-dataset/permutation-dataset.Rdata")
+```
+
+```{r}
+#Affichage du graphique
+plot(X, col = c(rep('black',100),rep('red', 100)),pch=16, xlab='x1', ylab='x2')
+```
+
+
+On souhaite tester si on est capable de détecter une différence entre ces deux populations, i.e., si on est capable de détecter une différence significative entre les deux nuages de points, stockés dans les 100 premières et les 100 dernières lignes de la matrice. On considère pour cela une statistique basée sur une information de voisinage :
+
+$$T = \frac{1}{n}\sum_{i=1}^n \mathbf{1}(y_{n(x_i)}=y_i)$$
+
+où $n(x_i) \in \{1, ..., i − 1, i + 1, .., n\}$ est l’indice du plus proche voisin du point $x_i$, $y_i = 1$ si $x_i$ appartient aux premier ensemble de points (les points noirs) et $y_i = 0$ sinon, et la fonction $\mathbf{1}$(.) vaut 1 si son argument est vérifié et 0 sinon.
+
+## 1. Que mesure cette statistique ?
+
+Cette statistique donne un indicatuer de l'hétérogénité des deux groupes. D'un point de vur plus mathématique, elle mesure la proportion de points qui ont leur plus proche vois du même groupe qu'eux. Ainsi, si les deux groupes sont bien hétérogènes, cette statistique sera proche de 1 et si au contraire, les deux groupes sont mélangés, cette statistique se rapprochera de 0.5. Et dans le cas extrême où les groupes sont indisociables (mais cas bizarre pour de l'aléatoire) car chaque voisin le plus proche appartient à l'autre groupe, cette statistique prendrait la valeur 0.
+
+Posons tout de suite les hypothèses de notre problème :
+- H0 : Les groupes sont indisociables
+- H1 : Les groupes sont disociables
+
+Nous sommes ici dans un cas unilatéral car même si T = 0 serait un cas très étrange pour de l'aléatoire et à creuser, ça ne permet pas en l'état de discriminer les groupes. Nous rejetterons donc l'hypothèse nulle si T est suffisament supérieur à 0.5
+
+```{r}
+#Ajout d'une colonne groupe à notre jeu de données
+#X_grp <- cbind(c(rep(0, 100), rep(1, 100)), X)
+#colnames(X_grp) <- c('grp', 'x1', 'x2')
+
+###Calcul de notre stat de Test
+
+#Fonction qui trouve le voisin le plus proche
+FindPpv <- function(ind){
+  return(names(ind)[which(ind == min(ind, na.rm = TRUE))])
+}
+
+#Matrice des distances
+distances <- as.matrix(dist(X))
+diag(distances) <- NA
+
+#Vecteur des voisins
+ppv <- apply(distances,1,FindPpv)
+
+#Calcul de la stat T
+statT0 <- mean(c(as.numeric(ppv[1:100])<=100, as.numeric(ppv[101:200])>100))
+```
+
+Ici, nous avons $T$ = `r round(statT0, 2)`
+
+## 2. Apppliquer une procédure par permutation pour B = 1000 tirages et évaluer la p-valeur obtenue. La différence entre les deux nuages de points est-elle significative ?
+
+Nous allons maintenant permuter aléatoirement les positions de nos points (leur position dans le jeu de données, pas leurs coordonnées. C'est à dire que la ligne du 4ème point pourra passer à la 142ème ligne par exemple.). En rappelant que les 100 premiers points correspondent à un groupe et les 100 derniers à l'autre groupe. Cette permutation aura pour effet de changer les groupes de certains points. L'opération étant totalement aléatoire et répété un grand nombre (1000) de fois, nous aurons des valeurs de T qui (sauf si on a vraiment pas de chance mais c'est très improbable) seront distribuées sous la loi de l'hypothèse nulle (Il n'y a pas de différence entre les deux groupes.).
+
+```{r}
+#Paramètres b du nombre de répétition
+b <- 1000
+statT <- numeric(b)
+
+#Boucle allant de 1 à b
+for (i in 1:b){
+  #Changement des positions des points au sein de X
+  X_h0 <- X[sample(1:dim(X)[1], replace=F),]
+  
+  #Calcul de T
+  distances <- as.matrix(dist(X_h0))
+  diag(distances) <- NA
+  ppv <- apply(distances,1,FindPpv)
+  statT[i] <- mean(c(as.numeric(ppv[1:100])<=100, as.numeric(ppv[101:200])>100))
+}
+
+#Ajout de notre vrai T (observé sur les données) à la simulation
+statT <- c(statT0,statT)
+```
+
+```{r}
+#Calcul de notre p-valeur
+pval = mean(statT[-1] >= statT0)
+
+#Affichage de l'histogramme de la distribution de nos T
+hist(statT, xlab='T', main='Distribution de notre statistique T')
+abline(v=statT0, col='red')
+```
+
+L'histogramme ci-dessus représente la distribution de nos statistiques T obtenues lors de nos `r b` tirages aléatoires. La ligne rouge représente notre statistique T observée sur le vrai jeu de données. Nous voyons que nos T sont centrées autour de 0.5, ce qui est logique puisque dans le cas aléatoire, nous devrions avoir T = 0.5 (Autant de chance que le plus proche voisin soit de la classe 1 que de la classe 2, donc de la même classe que soi.). Rien qu'en regardant l'histogramme, nous voyons que notre T observée est bien supérieure que dans le cas aléatoire. Et que donc, les groupes sont identifiables. La p-valeur de `r round(pval,2)` vient confirmer cette impression car inférieure à 0.05. La différence entre les deux nuages est donc bien significative.
+
+
+## 3. Reproduire cette analyse en tirant aléatoirement un ensemble de n = 10, 20, ..., 90 points parmi chaque population. Comment la p-valeur évolue t’elle ? Représenter les résultats sous la forme d’un graphique.
+
+```{r}
+#Initialisation des paramètres
+n <- seq(10,90,10)
+
+#Fonction qui calcule fait tous les traitements de tirage etc et calcule la p-valeur directement
+Pval_n <- function(n, t0, b){
+  
+  #Initialisation de statT
+  statT <- numeric(b)
+  
+  #Boucle allant de 1 à b
+  for (i in 1:b){
+    
+    #Tirage aléatoire de n valeurs de x dans chaque population
+    subX <- rbind(X[sample(1:as.integer(dim(X)[1]/2), size=n, replace=F),], X[sample(as.integer(dim(X)[1]/2+1):dim(X)[1], size=n, replace=F),])
+    
+    #Changement des positions des points au sein de subX
+    subX_h0 <- subX[sample(1:dim(subX)[1], replace=F),]
+    
+    #Calcul de T
+    distances <- as.matrix(dist(subX_h0))
+    diag(distances) <- NA
+    ppv <- apply(distances,1,FindPpv)
+    statT[i]<-mean(c(as.numeric(ppv[1:n])<=n, as.numeric(ppv[(n+1):(2*n)])>n))
+  }
+  statT <- c(t0,statT)
+  return(mean(statT[-1] >= t0))
+}
+```
+
+```{r}
+#Calcul de la p-valeur pour chaque n
+pval_n <- sapply(n, Pval_n, t0=statT0, b=1000)
+```
+
+```{r}
+plot(x=n, y=pval_n, xlab='n', ylab='p-valeur', main='Evolution de la p-valeur en fonction de la taille de chaque groupe', type='b')
+```
+
+On observe que que la p-valeur diminue dans un premier temps lorsque la taille de chaque échantllon augmente. Puis se stabiise lorsque $n$ est assez grand. Dans notre cas, la p-valeur semble se stabiliser à partir de $n = 50$.
+
+## 4. Enfin, reproduire cette seconde analyse 10 fois et représenter la variabilité dans les p-valeurs obtenues en fonction du nombre de points considérés. A partir de quelle taille d’échantillon est-on capable de détecter une différence significative en considérant que la médiane des p-valeurs obtenues sur les 10 répétitions doit être (et rester) inférieure à 0.05 ?
+
+```{r}
+pval_n_10 <- sapply(n, Pval_n, t0=statT0, b=1000)
+for(i in 1:9){
+  pval_n_10 <- rbind(pval_n_10, sapply(n, Pval_n, t0=statT0, b=1000))
+}
+```
+
+```{r}
+plot(x=n, y=pval_n_10[1,], xlab='n', ylab='p-valeur', main='Evolution de la p-valeur en fonction de la taille de chaque groupe', type='b', ylim=c(0,0.1))
+for(i in 2:dim(pval_n_10)[1]){
+ lines(x=n, y=pval_n_10[i,], xlab='n', ylab='p-valeur', main='Evolution de la p-valeur en fonction de la taille de chaque groupe', type='b', col=i) 
+}
+abline(h=0.05, col='red', lty=2)
+```
+
+Plus $n$ est grand, plus la variabilité des p-valeurs pour un $n$ fixé diminue. On constate qu'à partir de $n$ = 20 (dans chaque groupe), nous pouvons détécter une différence significative entre les deux groupes. Si on ne se base que sur la médiane des p-valeurs, on peut réduire encore un peu l'échantillon (de peu), mais vu la longueur des calculs, nous n'avons testé les n qu'avec un pas de 10.

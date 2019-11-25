@@ -1,0 +1,180 @@
+---
+title: "Question3"
+author: "Etienne"
+date: "11/24/2019"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+#Option pour que le code ne soit pas affiché lors du knit
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Exercice 3 - bootstrap & ACP
+
+```{r}
+load("~/Documents/Master 2 SSD/Statistique computationelle/Exam_Reech/examen-dataset/spectra.Rdata")
+library("FactoMineR")
+library("factoextra")
+
+```
+
+
+```{r}
+set.seed(1)
+
+## Vecteur de de longueur ncol(X) 
+i <-  c(1:ncol(X))
+## Sample aléatoire parmi les 546 spectres
+j <- sample(nrow(X), 50, replace = FALSE)
+
+
+## plot des spectres
+plot(i,X[j[1],] , type="l", ylim = c(0.03, 0.09), xlab = "spectral channel",ylab="intensity", main = "Représentation de 50 spectres aléatoirements choisis")
+for (k in j[2:50]) {
+lines(i,X[k,])
+}
+
+
+##ACP sur la matrice X 
+res.pca <- PCA(X, graph = FALSE, scale.unit = TRUE)
+
+##Extraction des valeurs propres
+eig.val <- get_eigenvalue(res.pca)
+var_exp <- eig.val[1:10,2]
+var_cumul <- eig.val[2,3]
+
+
+### Affichage des variances expliquées des 10 premiers axes
+plot(var_exp, type = "b",xlab= "n-iéme composante",ylab="% de variance expliquée", main = "Proportion de variance expliquée par les 10 premières composantes")
+
+
+### Plot des deux premiers axes sous formes de spectres (a finir)
+plot(i,res.pca$var$coord[,1], type = "l",xlab = "spectral channel",ylab="intensity", main=" Spectres des deux premières composantes" );
+lines(i,res.pca$var$coord[,2])
+
+
+```
+
+
+Les deux premières composantes expliquent `r round(var_cumul,3)`% de la variance.
+La représentation des spectres des deux premières dimensions parait cohérent avec les autres spectres, l'allure est similaire mais les valeurs sont beaucoup plus faibles
+
+### Implemantation de la procédure bootstrap
+
+```{r}
+
+
+set.seed(13)
+require(bootstrap)
+
+n <- length(X[,1])
+set.seed(1)
+B <- 20
+cor_boots_dim1 <- NULL
+cor_boots_dim2 <- NULL
+### ACP avec Bootstrap
+var_exp_boots <- NULL
+for(b in 1:B){
+  ind = sample(c(1:n), n, replace = TRUE)
+  acp_boots <- PCA(X[ind,], graph = FALSE, scale.unit = TRUE)
+  eig.val_boots <- get_eigenvalue(acp_boots)
+  var_exp_boots <- rbind(var_exp_boots,eig.val_boots[1:10,2])
+  cor_boots_dim1 <- cbind(cor_boots_dim1,acp_boots$var$cor[,"Dim.1"])
+  cor_boots_dim2 <- cbind(cor_boots_dim2,acp_boots$var$cor[,"Dim.2"])
+}
+
+
+# Calcul des intervalles de confiance
+alpha = 0.05
+Iperc <-NULL
+b1 <- NULL; b2 <- NULL
+
+
+# percentile method
+for (j in 1:length(var_exp_boots[1,])) {
+  q1 = quantile(var_exp_boots[,j], alpha/2)
+  q2 = quantile(var_exp_boots[,j], 1-alpha/2)
+  b2 <- rbind(b2,q2 )
+  b1 <- rbind(b1, q1)
+}
+inter_conf <- cbind(b1, b2)
+
+
+## Plot des la variance expliquée et de son intervalles de confiance
+plot(inter_conf[,1], type = "l", col="red", main="Variance expliquée par composante", xlab="n-ième composante", ylab="% de variance expliquée", lty=2);lines(inter_conf[,2], col="red", type = "l", lty=2); lines(var_exp, type = "l")
+```
+
+L'écart de l'interval de confiance réduit fortement pour les composantes expliquant le moins de variance. 
+
+
+
+```{r}
+hist(var_exp_boots[,"Dim.1"], col = "lightblue", border = "white",xlab="% de variance expliquée", main = "Histogramme de la variance expliquée \n par la 1ère composante estimée", ylab = "Fréquence")
+
+abline(v = inter_conf[1,],lty = 2, lwd = 2, col = "red")
+
+legend("topleft", c("red"), c("IC-perc"), col = c("red"),lty =2, lwd = 2, bg = "white")
+
+abline(v = var_exp["Dim.1"], lwd = 2)
+
+mtext("Valeur réelle", side = 1, at = var_exp["Dim.1"])
+
+box()
+```
+
+
+```{r}
+hist(var_exp_boots[,"Dim.2"], col = "lightblue", border = "white",xlab="% de variance expliquée", main = "Histogramme de la variance expliquée \n par la 2ème composante estimée", ylab = "Fréquence")
+
+abline(v = inter_conf[2,],lty = 2, lwd = 2, col = "red")
+
+legend("topleft", c("red"), c("IC-perc"), col = c("red"),lty =2, lwd = 2, bg = "white")
+
+abline(v = var_exp["Dim.2"], lwd = 2)
+
+mtext("Valeur réelle", side = 1, at = var_exp["Dim.2"])
+
+box()
+```
+
+
+La distribution de l'estimation de la variance expliquée et la valeur réelle sont comprises entre les borne de l'interval de confiance.
+
+
+## Question 4
+
+
+```{r}
+
+##### Calcul des intervalles de confiance pour les cor des 2 premiers axes
+alpha <- 0.05
+Iperc <-NULL
+b1 <- NULL; b2 <- NULL; b3 <- NULL; b4 <- NULL
+inter_conf_cor <- NULL
+
+##### percentile method
+for (j in 1:length(cor_boots_dim2[,1])) {
+  q1 <- quantile(cor_boots_dim1[j,], alpha/2)
+  q2 <- quantile(cor_boots_dim1[j,], 1-alpha/2)
+  q3 <- quantile(cor_boots_dim2[j,], alpha/2)
+  q4 <- quantile(cor_boots_dim2[j,], 1-alpha/2)
+  b1 <- rbind(b1,q1)
+  b2 <- rbind(b2,q2 )
+  b3 <- rbind(b3,q3 )
+  b4 <- rbind(b4,q4 )
+
+}
+inter_conf_cor1 <- cbind(b1, b2)
+inter_conf_cor2 <- cbind(b3, b4)
+
+
+plot(i,res.pca$var$cor[,1], type = "l",xlab = "spectral channel",ylab="intensity", main=" Spectres des deux premières composantes avec interval de confiance" );
+lines(i,res.pca$var$cor[,2])
+lines(inter_conf_cor1[,1], col="red",lty =2)
+lines(inter_conf_cor1[,2], col="red",lty =2)
+lines(inter_conf_cor2[,1], col="blue",lty =2)
+lines(inter_conf_cor2[,2], col="blue",lty =2)
+
+```
+
+L'interval de confiance encadre bien les spectres originaux. 
