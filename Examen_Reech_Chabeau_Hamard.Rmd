@@ -133,7 +133,11 @@ Iunif <- function(x, m){
   
   #Calcul de l'intégrale
   ihat = mean(1/sqrt(2*pi)*exp(-(-x/u)^2/2)*x/u^2) + 2*mean(1/sqrt(2*pi)*exp(-(u*x)^2/2)*x)
-  return(ihat)
+  
+  #Calcul Vn
+  vn = var(1/sqrt(2*pi)*exp(-(-x/u)^2/2)*x/u^2 + 2*1/sqrt(2*pi)*exp(-(u*x)^2/2)*x)
+  
+  return(list(ihat, vn))
 }
 ```
 
@@ -150,7 +154,11 @@ Inorm <- function(x, m){
   
   #Calcul de l'intégrale
   ihat = mean(g<=x)
-  return(ihat)
+  
+  #Calcul Vn
+  vn = var(g<=x)
+  
+  return(list(ihat, vn))
 }
 ```
 
@@ -160,13 +168,76 @@ Inorm <- function(x, m){
 #Paramètres de notre approximation
 m <- 1000
 x <- seq(0.1,3,0.1)
-plot(x, pnorm(x), type='b', ylim=c(0,1))
-lines(x, sapply(x,Iunif,m=1000), type='b', col='red')
-lines(x, sapply(x,Inorm,m=1000), type='b', col='green')
+
+#Graphiques
+plot(x, pnorm(x), type='l', ylim=c(0.5,1), ylab='F(x)')
+lines(x, sapply(x,Iunif,m=1000)[1,], type='l', col='red')
+lines(x, sapply(x,Inorm,m=1000)[1,], type='l', col='green')
+legend(0,1, legend=c('Vrai F(x)', 'Estimation unif', 'Estimation norm'), col=c('black', 'red', 'green'), lty=rep(1,3), cex=1)
 ```
 
+Nos estimations semblent plutôt satisfaisantes tant que $x$ ne séloigne pas trop de 0. Plus on s'éloigne, moins l'estimation par la loi uniforme semble bonne. Pour l'estimation par loi normale en revanche, les estimations semblent meilleures que celles par la méthode basée sur la loi uniforme quand $x$ grandit.
 
 ## 4. Comparer la variance et les intervalles de confiance des deux estimateur pour les valeurs croissantes de $x \in [0.1, 3]$ et interpréter les résultats obtenus.
+
+On rappelle la variance $V_n$ des estimateurs :
+
+$$
+V_n = \frac{1}{n-1} \sum_{i=1}^n (g(Xi)-S_n)²
+$$
+
+où $S_n$ est l'estimation ponctuelle.
+
+```{r}
+#Graphique des variances des estimateurs
+plot(x, sapply(x,Iunif,m=1000)[2,], type='l', ylim=c(0,1) ,ylab='Var')
+lines(x, sapply(x,Inorm,m=1000)[2,], type='l', col='red')
+legend(0,1, legend=c('Uinf', 'Norm'), col=c('black', 'red'), lty=rep(1,2), cex=1)
+```
+
+En fonction de la valeur de $x$ la variance sera plus avntageuse pour l'estimation par loi uniforme que par loi normale et inversement.
+
+L'intervalle de confiance est ainsi défini par
+
+$$
+[S_n - t_{\alpha/2} \sqrt{V_n/n} ; S_n + t_{\alpha/2} \sqrt{V_n/n}]
+$$
+
+Commençons par regarder les estimations par loi uniforme. Le graphique ci-dessous nous montre en noir la vrai fonction de répartition de la loi normale et en rouge l'estimation ponctuelle entourée par son intervalle de confiance à 95% (en pointillés).
+
+Comme prévu en regardant la variance, nous avons un intervalle de confiance très restreint pour $x$ compris entre 0.5 et 1 puis nous voyons que cet intervalle s'élargit de plus en plus au fur et à mesure que $x$ grandit.
+
+```{r}
+m <- 1000
+
+#Estimations
+estim <- sapply(x,Iunif,m=m)
+
+#Graphiques
+plot(x, pnorm(x), type='l', ylim=c(0.5,1.2), ylab='F(x)', main = 'Estmimation par loi uniforme')
+lines(x, unlist(estim[1,]), type='l', col='red')
+lines(x, unlist(estim[1,])+1.96*sqrt(unlist(estim[2,])/m), type='l', col='red', lty=2)
+lines(x, unlist(estim[1,])-1.96*sqrt(unlist(estim[2,])/m), type='l', col='red', lty=2)
+```
+
+Regardons maintenant le même graphique pour l'estimation par loi normale.
+
+```{r}
+m <- 1000
+
+#Estimations
+estim <- sapply(x,Inorm,m=m)
+
+#Graphiques
+plot(x, pnorm(x), type='l', ylim=c(0.5,1.2), ylab='F(x)', main = 'Estmimation par loi normale')
+lines(x, unlist(estim[1,]), type='l', col='red')
+lines(x, unlist(estim[1,])+1.96*sqrt(unlist(estim[2,])/m), type='l', col='red', lty=2)
+lines(x, unlist(estim[1,])-1.96*sqrt(unlist(estim[2,])/m), type='l', col='red', lty=2)
+```
+
+Ici c'est l'inverse, la méthode basée sur la loi normale a un intervalle de confiance qui se restreint au fur et à mesure que $x$ augmente.
+
+Nous concluons que pour des valeurs de $x$ comprises entre 0.2 environ et 1.5, la méthode de Monte Carlo basée sur une loi uniforme sera mailleure que celle basée sur une loi normale. Pour les autres valeurs, ce sera l'inverse.
 
 ## 5. Comment modifier la procédure si $x < 0$ ?
 
@@ -382,10 +453,6 @@ Posons tout de suite les hypothèses de notre problème :
 Nous sommes ici dans un cas unilatéral car même si T = 0 serait un cas très étrange pour de l'aléatoire et à creuser, ça ne permet pas en l'état de discriminer les groupes. Nous rejetterons donc l'hypothèse nulle si T est suffisament supérieur à 0.5
 
 ```{r}
-#Ajout d'une colonne groupe à notre jeu de données
-#X_grp <- cbind(c(rep(0, 100), rep(1, 100)), X)
-#colnames(X_grp) <- c('grp', 'x1', 'x2')
-
 ###Calcul de notre stat de Test
 
 #Fonction qui trouve le voisin le plus proche
